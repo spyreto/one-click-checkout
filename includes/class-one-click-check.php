@@ -30,6 +30,10 @@ class One_Click_Checkout
     add_action('woocommerce_order_status_completed', array($this, 'save_checkout_data'));
     // Display the Buy Now button on the product page.
     add_action('woocommerce_after_add_to_cart_button', array($this, 'display_buy_now_button'));
+    // Handle the Buy Now button click.
+    add_action('wp_ajax_one_click_checkout', array($this, 'handle_one_click_checkout'));
+    // Restore the original cart after a successful purchase.
+    add_action('woocommerce_thankyou', array($this, 'restore_original_cart'));
   }
 
   /**
@@ -55,7 +59,23 @@ class One_Click_Checkout
    */
   public function enqueue_scripts()
   {
-    // wp_enqueue_script( ... );
+    wp_enqueue_script(
+      'one-click-checkout-script',
+      plugin_dir_url(dirname(__FILE__)) . 'assets/js/one-click-checkout.js',
+      array(),
+      '1.0.0',
+      true
+    );
+
+    wp_localize_script(
+      'one-click-checkout-script',
+      'oneClickCheckoutParams',
+      array(
+        'ajax_url' => admin_url('admin-ajax.php'),
+        'nonce' => wp_create_nonce('one_click_checkout_nonce'),
+        // You can pass other parameters here as needed
+      )
+    );
   }
 
   /**
@@ -175,6 +195,8 @@ class One_Click_Checkout
 
     // Save selected shipping method
     $shipping_methods = $order->get_shipping_methods();
+
+
     if (!empty($shipping_methods)) {
       $shipping_method_ids = array();
       foreach ($shipping_methods as $item_id => $shipping_method) {
@@ -215,14 +237,119 @@ class One_Click_Checkout
     // Retrieve saved user data
     $billing_data = get_user_meta($user_id, 'one_click_checkout_billing_address', true);
     $shipping_data = get_user_meta($user_id, 'one_click_checkout_shipping_address', true);
+    $preffered_shipping_methods = get_user_meta($user_id, 'one_click_checkout_shipping_methods', true);
+
     $preferred_payment_method = get_user_meta($user_id, 'one_click_checkout_payment_method', true);
 
     // Check if the necessary data is available and complete
-    if (empty($billing_data) || empty($shipping_data) || empty($preferred_payment_method)) {
+    if (empty($billing_data) || empty($shipping_data) || empty($preffered_shipping_methods)) {
       return; // Required data is not complete, don't show the Buy Now button
     }
 
+    global $product;
+    $product_id = $product->get_id();
+
     // Display the Buy Now button
-    echo '<button id="buy-now" class="button checkout-button">Buy Now</button>';
+    echo '<button id="buy-now" data-product-id="' . esc_attr($product_id) . '" class="single_add_buy_now_button button">Buy Now</button>';
+  }
+
+  /**
+   * Handle the Buy Now button click.
+   *
+   * This function is called when the Buy Now button is clicked.
+   * It checks the nonce, retrieves the product ID and quantity from the request,
+   */
+  // public function handle_one_click_checkout()
+  // {
+  //   // Check the nonce
+  //   if (!check_ajax_referer('one_click_checkout_nonce', 'nonce')) {
+  //     wp_die('Nonce verification failed!');
+  //   }
+
+  //   $product_id = intval($_POST['product_id']);
+  //   $quantity = isset($_POST['quantity']) ? intval($_POST['quantity']) : 1;
+  //   $user_id = get_current_user_id();
+
+  //   // Retrieve saved user data
+  //   $preferred_payment_method = get_user_meta($user_id, 'one_click_checkout_payment_method', true);
+  //   $preffered_shipping_methods = get_user_meta($user_id, 'one_click_checkout_shipping_methods', true);
+
+  //   // Create a new order
+  //   $order = wc_create_order();
+  //   $order->add_product(wc_get_product($product_id), $quantity);
+
+  //   // Set billing and shipping from user meta
+  //   $billing_data = get_user_meta($user_id, 'one_click_checkout_billing_address', true);
+  //   $shipping_data = get_user_meta($user_id, 'one_click_checkout_shipping_address', true);
+
+  //   $order->set_address($billing_data, 'billing');
+  //   $order->set_address($shipping_data, 'shipping');
+
+  //   $order->calculate_totals();
+
+  //   // Return the order pay URL
+  //   wp_send_json_success(['checkout_url' => $order->get_checkout_payment_url()]);
+
+  //   // Proceed with checkout logic
+  //   // Validate product, retrieve user data, create an order, process payment
+  //   // Return a response
+
+  //   wp_die();
+  // }
+
+  /**
+   * Handle the Buy Now button click.
+   *
+   * This function is called when the Buy Now button is clicked.
+   * It checks the nonce, retrieves the product ID and quantity from the request,
+   */
+  public function handle_one_click_checkout()
+  {
+
+    // Check the nonce
+    if (!check_ajax_referer('one_click_checkout_nonce', 'nonce')) {
+      wp_die('Nonce verification failed!');
+    }
+
+    $user_id = get_current_user_id();
+
+    // Retrieve the product ID and quantity
+    $product_id = $_POST['product_id'];
+    $quantity = isset($_POST['quantity']) ? intval($_POST['quantity']) : 1;
+
+    // Store current cart items
+    $cart_contents = WC()->cart->get_cart_contents();
+    WC()->session->set('saved_cart_contents', $cart_contents);
+
+    // Empty the current cart
+    WC()->cart->empty_cart(false);
+
+    // Add the 'Buy Now' product to the cart
+    WC()->cart->add_to_cart($product_id, $quantity);
+
+    // Apply stored shipping method
+    $preferred_shipping_method = get_user_meta($user_id, 'preferred_shipping_method', true);
+    if ($preferred_shipping_method) {
+      WC()->session->set('chosen_shipping_methods', array($preferred_shipping_method));
+    }
+
+    // Return the checkout URL
+    wp_send_json_success(['checkout_url' => wc_get_checkout_url()]);
+  }
+
+  /**
+   * Restore the original cart after a successful purchase.
+   *
+   * @param int $order_id The ID of the completed order.
+   */
+  function restore_original_cart($order_id)
+  {
+    $saved_cart_contents = WC()->session->get('saved_cart_contents');
+    if ($saved_cart_contents) {
+      foreach ($saved_cart_contents as $item_key => $item) {
+        WC()->cart->add_to_cart($item['product_id'], $item['quantity'], $item['variation_id'], $item['variation']);
+      }
+      WC()->session->__unset('saved_cart_contents');
+    }
   }
 }
