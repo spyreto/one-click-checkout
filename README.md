@@ -1,6 +1,6 @@
 <div id="top"></div>
 
-<img src="assets/images//logo.webp" alt="One-Click Checkout Logo" width="200"/>
+<img src="assets/images/logo.webp" alt="One-Click Checkout Logo" width="200"/>
 
 # One-Click Checkout for WooCommerce
 
@@ -39,7 +39,7 @@ One-Click Checkout is a plugin for WooCommerce that allows customers to make pur
 
 ### How do I install and activate the One-Click Checkout plugin?
 
-You can install the plugin by downloading it from a trusted source and uploading it to your WordPress Dashboard under Plugins > Add New. Once uploaded, click "Activate" to start using it.
+You can install the plugin by downloading it and uploading it to your WordPress Dashboard under Plugins > Add New. Once uploaded, click "Activate" to start using it.
 
 ### Can I customize the appearance of the 'Buy Now' button?
 
@@ -55,7 +55,12 @@ User data and privacy are of utmost importance. The plugin uses the existing Woo
 
 ### Can I Translate the Plugin into My Preferred Language?
 
-Yes, you can translate the plugin into your preferred language. To do so, you can use WordPress translation plugins or manually edit the provided translation files. Translating the plugin allows you to customize it to your language and make it more accessible to users who speak different languages.
+Yes, you can translate the plugin into your preferred language. To do so, you can use WordPress translation plugins or manually edit the provided translation files. Translating the plugin allows you to customize it to your language and make it more
+accessible to users who speak different languages.
+
+### How can I provide feedback or report issues?
+
+Please visit our [GitHub repository](https://github.com/spyreto/one-click-checkout/issues) to report issues or provide feedback.
 
 <p align="right">(<a href="#top">back to top</a>)</p>
 
