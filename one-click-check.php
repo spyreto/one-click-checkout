@@ -6,7 +6,7 @@
  * Description: A plugin to add a one-click checkout button to your WooCommerce store.
  * Version: 1.0
  * Author: Spiros Dimou
- * Author URI: https://github.com/spyreto
+ * Author URI: https://www.linkedin.com/in/spiridon-dimou/
  * License: GPL2
  */
 

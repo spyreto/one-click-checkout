@@ -4,6 +4,7 @@ document.addEventListener("DOMContentLoaded", function () {
     ".variations_form .variations select"
   );
 
+  // Update the state of the Buy Now button based on the selected variation
   function updateBuyNowButtonState() {
     var allVariationsSelected = true;
 
