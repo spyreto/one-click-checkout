@@ -1,6 +1,6 @@
 <div id="top"></div>
 
-![One-Click Checkout Logo](assets/images//logo.webp)
+<img src="assets/images//logo.webp" alt="One-Click Checkout Logo" width="200"/>
 
 # One-Click Checkout for WooCommerce
 
