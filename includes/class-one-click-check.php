@@ -26,6 +26,8 @@ class One_Click_Checkout
     // Register the stylesheets for the public-facing side of the site.
     add_action('wp_enqueue_scripts', array($this, 'enqueue_styles'));
     add_action('wp_enqueue_scripts', array($this, 'enqueue_scripts'));
+    // Add custom CSS to the "Buy now" button.
+    add_action('wp_head', array($this, 'add_custom_css'));
     // Save user data for one-click checkout after a successful purchase.
     add_action('woocommerce_order_status_completed', array($this, 'save_checkout_data'));
     // Display the Buy Now button on the product page.
@@ -78,6 +80,14 @@ class One_Click_Checkout
     );
   }
 
+  public function add_custom_css()
+  {
+    $custom_css = get_option('one_click_checkout_custom_css');
+    if (!empty($custom_css)) {
+      echo '<style type="text/css">' . $custom_css . '</style>';
+    }
+  }
+
   /**
    * Adds settings tab to WooCommerce settings.
    */
@@ -124,12 +134,20 @@ class One_Click_Checkout
         'desc'     => '',
         'id'       => 'one_click_checkout_section_title'
       ),
-      'activate_buy_now' => array(
+      array(
         'name'     => __('Buy Now Button', 'one-click-checkout'),
         'type'     => 'checkbox',
         'desc'     => __('Enable the Buy Now button on product pages', 'one-click-checkout'),
         'id'       => 'one_click_checkout_activate_buy_now',
         'default'  => 'no',
+      ),
+      array(
+        'title'    => __('Custom CSS for "Buy Now" Button', 'one-click-checkout'),
+        'desc'     => __('Add your custom CSS styles for the "Buy Now" button.', 'one-one-click-checkout'),
+        'id'       => 'one_click_checkout_custom_css',
+        'type'     => 'textarea',
+        'css'      => 'min-width:300px; height: 200px;', // Optional: CSS styling for the textarea
+        'placeholder'  => "#buy-now {\n       /* " . __('Custom styles here', 'one-click-checkout') . " */\n}",
       ),
       'section_end' => array(
         'type'     => 'sectionend',

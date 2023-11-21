@@ -26,6 +26,7 @@ function one_click_checkout_cleanup_user_meta()
 function one_click_checkout_cleanup_options()
 {
   delete_option('one_click_checkout_activate_buy_now');
+  delete_option('one_click_checkout_custom_css');
   // Add other options as needed
 }
 
