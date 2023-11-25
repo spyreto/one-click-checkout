@@ -167,6 +167,7 @@ class One_Click_Checkout
     woocommerce_update_options($this->get_settings());
   }
 
+
   /**
    * Saves user data for one-click checkout after a successful purchase.
    *
@@ -230,6 +231,7 @@ class One_Click_Checkout
       update_user_meta($user_id, 'one_click_checkout_payment_method', $payment_method);
     }
   }
+
 
   /**
    * Display the Buy Now button on the product page.
