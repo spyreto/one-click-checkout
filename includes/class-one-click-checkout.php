@@ -275,6 +275,40 @@ class One_Click_Checkout
     echo '<button id="buy-now" data-product-id="' . esc_attr($product_id) . '" class="single_add_buy_now_button button">Buy Now</button>';
   }
 
+  /**
+   * Displays the current user's shipping address in the checkout modal.
+   *
+   * This function fetches  user's shipping address from their WooCommerce profile
+   * and formats it for display. It is intended to be called when rendering the checkout form
+   * within a modal, showing a concise view of the shipping address with an option to change it.
+   */
+  function display_shipping_address()
+  {
+
+    // Fetching user shipping details
+    $customer = WC()->customer;
+    $shipping_address = array(
+      'first_name' => $customer->get_shipping_first_name(),
+      'last_name'  => $customer->get_shipping_last_name(),
+      'address_1'  => $customer->get_shipping_address_1(),
+      'address_2'  => $customer->get_shipping_address_2(),
+      'city'       => $customer->get_shipping_city(),
+      'state'      => $customer->get_shipping_state(),
+      'postcode'   => $customer->get_shipping_postcode(),
+      'country'    => $customer->get_shipping_country()
+    );
+
+    // Format the address
+    $formatted_address = WC()->countries->get_formatted_address($shipping_address);
+
+    // Display the formatted address
+    echo '<div class="woocommerce-billing-fields__field-wrapper one-click-checkout-shipping-address"">';
+    echo '<h3>' . __('Shipping Address:', 'one-click-checkout') . '</h3>';
+    echo '<address>' . $formatted_address . '</address>';
+    echo '<a href="#" class="change-shipping-address">' . __('Choose different address', 'one-click-checkout') . '</a>';
+    echo '</div>';
+  }
+
 
   /**
    * Handle the Buy Now button click.
@@ -311,6 +345,9 @@ class One_Click_Checkout
     if ($preferred_shipping_method) {
       WC()->session->set('chosen_shipping_methods', array($preferred_shipping_method));
     }
+
+    add_action('woocommerce_checkout_after_customer_details',  array($this, 'display_shipping_address'), 20);
+
 
     // Load the checkout form
     echo do_shortcode('[woocommerce_checkout]');

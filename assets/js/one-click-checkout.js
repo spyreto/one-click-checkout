@@ -46,6 +46,7 @@ document.addEventListener("DOMContentLoaded", function () {
       data.append("nonce", oneClickCheckoutParams.nonce);
       data.append("product_id", productId);
       data.append("quantity", quantity);
+      data.append("is_modal", true);
 
       // AJAX request to fetch checkout form
       fetch(oneClickCheckoutParams.ajax_url, {
