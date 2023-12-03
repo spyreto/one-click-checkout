@@ -33,7 +33,9 @@ class One_Click_Checkout
     // Display the Buy Now button on the product page.
     add_action('woocommerce_after_add_to_cart_button', array($this, 'display_buy_now_button'));
     // Handle the Buy Now button click.
-    add_action('wp_ajax_one_click_checkout', array($this, 'handle_one_click_checkout'));
+    add_action('wp_ajax_fetch_checkout_form', array($this, 'fetch_checkout_form'));
+    // Load the modal template.
+    add_action('wp_footer', array($this, 'conditionally_load_modal'));
     // Restore the original cart after a successful purchase.
     add_action('woocommerce_thankyou', array($this, 'restore_original_cart'));
   }
@@ -53,7 +55,7 @@ class One_Click_Checkout
    */
   public function enqueue_styles()
   {
-    // wp_enqueue_style( ... );
+    wp_enqueue_style('one-click-checkout-style',  plugin_dir_url(dirname(__FILE__)) . 'assets/css/custom-style.css');
   }
 
   /**
@@ -75,7 +77,7 @@ class One_Click_Checkout
       array(
         'ajax_url' => admin_url('admin-ajax.php'),
         'nonce' => wp_create_nonce('one_click_checkout_nonce'),
-        // You can pass other parameters here as needed
+        // Pass other parameters...
       )
     );
   }
@@ -273,60 +275,17 @@ class One_Click_Checkout
     echo '<button id="buy-now" data-product-id="' . esc_attr($product_id) . '" class="single_add_buy_now_button button">Buy Now</button>';
   }
 
-  /**
-   * Handle the Buy Now button click.
-   *
-   * This function is called when the Buy Now button is clicked.
-   * It checks the nonce, retrieves the product ID and quantity from the request,
-   */
-  // public function handle_one_click_checkout()
-  // {
-  //   // Check the nonce
-  //   if (!check_ajax_referer('one_click_checkout_nonce', 'nonce')) {
-  //     wp_die('Nonce verification failed!');
-  //   }
-
-  //   $product_id = intval($_POST['product_id']);
-  //   $quantity = isset($_POST['quantity']) ? intval($_POST['quantity']) : 1;
-  //   $user_id = get_current_user_id();
-
-  //   // Retrieve saved user data
-  //   $preferred_payment_method = get_user_meta($user_id, 'one_click_checkout_payment_method', true);
-  //   $preffered_shipping_methods = get_user_meta($user_id, 'one_click_checkout_shipping_methods', true);
-
-  //   // Create a new order
-  //   $order = wc_create_order();
-  //   $order->add_product(wc_get_product($product_id), $quantity);
-
-  //   // Set billing and shipping from user meta
-  //   $billing_data = get_user_meta($user_id, 'one_click_checkout_billing_address', true);
-  //   $shipping_data = get_user_meta($user_id, 'one_click_checkout_shipping_address', true);
-
-  //   $order->set_address($billing_data, 'billing');
-  //   $order->set_address($shipping_data, 'shipping');
-
-  //   $order->calculate_totals();
-
-  //   // Return the order pay URL
-  //   wp_send_json_success(['checkout_url' => $order->get_checkout_payment_url()]);
-
-  //   // Proceed with checkout logic
-  //   // Validate product, retrieve user data, create an order, process payment
-  //   // Return a response
-
-  //   wp_die();
-  // }
 
   /**
    * Handle the Buy Now button click.
-   *
+   * 
    * This function is called when the Buy Now button is clicked.
-   * It checks the nonce, retrieves the product ID and quantity from the request,
+   * It checks the nonce, response with the checkout form HTML.
    */
-  public function handle_one_click_checkout()
+  public function fetch_checkout_form()
   {
-
-    // Check the nonce
+    error_log('fetch_checkout_form');
+    // Verify the nonce
     if (!check_ajax_referer('one_click_checkout_nonce', 'nonce')) {
       wp_die('Nonce verification failed!');
     }
@@ -353,23 +312,71 @@ class One_Click_Checkout
       WC()->session->set('chosen_shipping_methods', array($preferred_shipping_method));
     }
 
-    // Return the checkout URL
-    wp_send_json_success(['checkout_url' => wc_get_checkout_url()]);
+    // Load the checkout form
+    echo do_shortcode('[woocommerce_checkout]');
+
+    wp_die();
   }
 
+
   /**
-   * Restore the original cart after a successful purchase.
-   *
-   * @param int $order_id The ID of the completed order.
+   * Load the modal template.
    */
-  function restore_original_cart($order_id)
+  public function load_modal_template()
   {
-    $saved_cart_contents = WC()->session->get('saved_cart_contents');
-    if ($saved_cart_contents) {
-      foreach ($saved_cart_contents as $item_key => $item) {
-        WC()->cart->add_to_cart($item['product_id'], $item['quantity'], $item['variation_id'], $item['variation']);
-      }
-      WC()->session->__unset('saved_cart_contents');
+    include_once plugin_dir_path(__FILE__) . '../templates/modal-template.php';
+  }
+
+
+  /**
+   * Conditionally load the modal template.
+   */
+  public function conditionally_load_modal()
+  {
+    if (is_product() || is_shop()) { // Adjust conditions as needed
+      $this->load_modal_template();
     }
   }
 }
+
+
+
+/**
+ * Handle the Buy Now button click.
+ *
+ * This function is called when the Buy Now button is clicked.
+ * It checks the nonce, retrieves the product ID and quantity from the request,
+ */
+  // public function handle_one_click_checkout()
+  // {
+
+  //   // Check the nonce
+  //   if (!check_ajax_referer('one_click_checkout_nonce', 'nonce')) {
+  //     wp_die('Nonce verification failed!');
+  //   }
+
+  //   $user_id = get_current_user_id();
+
+  //   // Retrieve the product ID and quantity
+  //   $product_id = $_POST['product_id'];
+  //   $quantity = isset($_POST['quantity']) ? intval($_POST['quantity']) : 1;
+
+  //   // Store current cart items
+  //   $cart_contents = WC()->cart->get_cart_contents();
+  //   WC()->session->set('saved_cart_contents', $cart_contents);
+
+  //   // Empty the current cart
+  //   WC()->cart->empty_cart(false);
+
+  //   // Add the 'Buy Now' product to the cart
+  //   WC()->cart->add_to_cart($product_id, $quantity);
+
+  //   // Apply stored shipping method
+  //   $preferred_shipping_method = get_user_meta($user_id, 'preferred_shipping_method', true);
+  //   if ($preferred_shipping_method) {
+  //     WC()->session->set('chosen_shipping_methods', array($preferred_shipping_method));
+  //   }
+
+  //   // Return the checkout URL
+  //   wp_send_json_success(['checkout_url' => wc_get_checkout_url()]);
+  // }
