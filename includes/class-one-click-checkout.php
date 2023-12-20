@@ -34,10 +34,12 @@ class One_Click_Checkout
     add_action('woocommerce_after_add_to_cart_button', array($this, 'display_buy_now_button'));
     // Handle the Buy Now button click.
     add_action('wp_ajax_fetch_checkout_form', array($this, 'fetch_checkout_form'));
+    add_action('wp_ajax_update_shipping_address', array($this, 'update_shipping_address'));
+    add_action('wp_ajax_handle_modal_checkout', array($this, 'handle_modal_checkout'));
     // Load the modal template.
     add_action('wp_footer', array($this, 'conditionally_load_modal'));
     // Restore the original cart after a successful purchase.
-    add_action('woocommerce_thankyou', array($this, 'restore_original_cart'));
+    // add_action('woocommerce_thankyou', array($this, 'restore_original_cart'));
   }
 
   /**
@@ -80,6 +82,10 @@ class One_Click_Checkout
         // Pass other parameters...
       )
     );
+
+    // wp_enqueue_script('woocommerce');
+    // wp_enqueue_script('wc-cart');
+    wp_enqueue_script('wc-checkout');
   }
 
   public function add_custom_css()
@@ -284,12 +290,13 @@ class One_Click_Checkout
    */
   function display_shipping_address()
   {
-
+    $user_id = get_current_user_id();
     // Fetching user shipping details
     $customer = WC()->customer;
     $shipping_address = array(
       'first_name' => $customer->get_shipping_first_name(),
       'last_name'  => $customer->get_shipping_last_name(),
+      'company'    => $customer->get_shipping_company(),
       'address_1'  => $customer->get_shipping_address_1(),
       'address_2'  => $customer->get_shipping_address_2(),
       'city'       => $customer->get_shipping_city(),
@@ -297,15 +304,54 @@ class One_Click_Checkout
       'postcode'   => $customer->get_shipping_postcode(),
       'country'    => $customer->get_shipping_country()
     );
-
     // Format the address
     $formatted_address = WC()->countries->get_formatted_address($shipping_address);
 
     // Display the formatted address
+    echo '<div class="one-click-checkout-loading">Loading...</div>'; // Spinner element
     echo '<div class="woocommerce-billing-fields__field-wrapper one-click-checkout-shipping-address"">';
-    echo '<h3>' . __('Shipping Address:', 'one-click-checkout') . '</h3>';
+    echo '<h3>' . __('Shipping Details:', 'one-click-checkout') . '</h3>';
     echo '<address>' . $formatted_address . '</address>';
-    echo '<a href="#" class="change-shipping-address">' . __('Choose different address', 'one-click-checkout') . '</a>';
+    echo '<a href="#" class="one-click-checkout-change-shipping-details">' . __('Change shipping details', 'one-click-checkout') . '</a>';
+    echo '<div id="one-click-checkout-shipping-address-form"  style="display:none;">';
+
+    // Change shipping address form
+    // Address line 1
+    echo '<p class="form-row form-row-wide">';
+    echo '<label for="shipping_address_1">' . esc_html__('Address', 'woocommerce') . '</label>';
+    echo '<input type="text" id="one_click_checkout_shipping_address_1" name="shipping_address_1" class="input-text" value="' . esc_attr($shipping_address['address_1']) . '">';
+    echo '</p>';
+
+    // City
+    echo '<p class="form-row form-row-wide">';
+    echo '<label for="shipping_city">' . esc_html__('City', 'woocommerce') . '</label>';
+    echo '<input type="text" id="one_click_checkout_shipping_city" name="shipping_city" class="input-text" value="' . esc_attr($shipping_address['city']) . '">';
+    echo '</p>';
+
+    // State
+    echo '<p class="form-row form-row-wide">';
+    echo '<label for="shipping_state">' . esc_html__('State', 'woocommerce') . '</label>';
+    echo '<select id="one_click_checkout_shipping_state" name="shipping_state" class="state_select">';
+    $countries_obj = new WC_Countries();
+    $states = $countries_obj->get_states($shipping_address['country']);
+    foreach ($states as $state_code => $state_name) {
+      $selected = ($state_code === $shipping_address['state']) ? ' selected="selected"' : '';
+      echo '<option value="' . esc_attr($state_code) . '"' . $selected . '>' . esc_html($state_name) . '</option>';
+    }
+    echo '</select>';
+    echo '</p>';
+
+    // Postcode
+    echo '<p class="form-row form-row-wide">';
+    echo '<label for="shipping_postcode">' . esc_html__('Postcode / ZIP', 'woocommerce') . '</label>';
+    echo '<input type="text" id="one_click_checkout_shipping_postcode" name="shipping_postcode" class="input-text" value="' . esc_attr($shipping_address['postcode']) . '">';
+    echo '</p>';
+
+    // Submit button
+    echo '<p class="form-row">';
+    echo '<button type="submit" class="button one-click-checkout-update-address-btn" disabled>' . esc_html__('Update Address', 'woocommerce') . '</button>';
+    echo '</p>';
+    echo '</div>';
     echo '</div>';
   }
 
@@ -318,11 +364,11 @@ class One_Click_Checkout
    */
   public function fetch_checkout_form()
   {
-    error_log('fetch_checkout_form');
     // Verify the nonce
     if (!check_ajax_referer('one_click_checkout_nonce', 'nonce')) {
       wp_die('Nonce verification failed!');
     }
+    ob_start();
 
     $user_id = get_current_user_id();
 
@@ -348,11 +394,181 @@ class One_Click_Checkout
 
     add_action('woocommerce_checkout_after_customer_details',  array($this, 'display_shipping_address'), 20);
 
-
     // Load the checkout form
     echo do_shortcode('[woocommerce_checkout]');
 
+    $checkout_form = ob_get_clean();
+
+    echo $checkout_form;
+
     wp_die();
+  }
+
+  public function update_shipping_address()
+  {
+    // Verify the nonce
+    if (!check_ajax_referer('one_click_checkout_nonce', 'nonce')) {
+      wp_die('Nonce verification failed!');
+    }
+
+    if (isset($_POST['address_data'])) {
+      $address_data = json_decode(stripslashes($_POST['address_data']), true);
+
+      $customer = WC()->customer;
+      // 
+      $shipping_country = $customer->get_shipping_country();
+
+      // Sanitize and set the new shipping address
+      $customer->set_shipping_address_1(sanitize_text_field($address_data['shippingAddress']));
+
+      $customer->set_shipping_city(sanitize_text_field($address_data['shippingCity']));
+      $customer->set_shipping_state(sanitize_text_field($address_data['shippingState']));
+
+      $customer->set_shipping_postcode(sanitize_text_field($address_data['shippingPostcode']));
+
+      $customer->save();
+
+      // Recalculate shipping after address change
+      WC()->cart->calculate_totals();
+
+      // Get full state name
+      $countries_obj = new WC_Countries();
+      $states = $countries_obj->get_states($shipping_country);
+      $shipping_state_name = isset($states[$address_data['shippingState']]) ? $states[$address_data['shippingState']] : $address_data['shippingState'];
+
+      // Set state name instead of state code
+      $address_data['shippingState'] = $shipping_state_name;
+
+      add_action('woocommerce_checkout_after_customer_details',  array($this, 'display_shipping_address'), 20);
+
+      ob_start();
+      // Load the checkout form
+      echo do_shortcode('[woocommerce_checkout]');
+      $checkout_form = ob_get_clean();
+
+      // Response data
+      $response_data = [
+        'shippingTotal' => WC()->cart->get_shipping_total(),
+        'newShippingAddress' => $address_data,
+        'checkoutHtml' => $checkout_form
+      ];
+
+      wp_send_json_success($response_data);
+    } else {
+      wp_send_json_error();
+    }
+  }
+
+  /**
+   * Handles the checkout form submition.
+   *
+   * This function is called after a successful purchase and returns the thank tou page.
+   * It checks the nonce, processes the checkout, and returns the thank you page content.
+   */
+  public function handle_modal_checkout()
+  {
+    // Verify the nonce
+    if (!check_ajax_referer('one_click_checkout_nonce', 'nonce')) {
+      error_log('Nonce verification failed!');
+      wp_die('Nonce verification failed!');
+    }
+
+    // Simulate the checkout process
+    $checkout = WC_Checkout::instance();
+    $order_id = $checkout->create_order($_POST);
+
+    if (is_wp_error($order_id)) {
+      // Handle error in order creation
+      wp_send_json_error($order_id->get_error_message());
+      return;
+    }
+
+    $order = wc_get_order($order_id);
+
+    // Assuming the order requires payment
+    if ($order->needs_payment()) {
+      // Get the payment gateway redirect URL
+      $payment_gateways = WC()->payment_gateways->payment_gateways();
+      $payment_gateway = isset($payment_gateways[$order->get_payment_method()]) ? $payment_gateways[$order->get_payment_method()] : null;
+
+      if ($payment_gateway) {
+        // Manually process the payment
+        $result = $payment_gateway->process_payment($order_id);
+        error_log(print_r($result, true));
+
+        if ($result['result'] === 'success') {
+          // Send the redirect URL to the client
+          error_log('RESULT');
+          wp_send_json_success(['redirect_url' => $result['redirect']]);
+        } else {
+          error_log('RESULT ERROR');
+          wp_send_json_error('Error processing payment.');
+        }
+      } else {
+        // Capture 'thank you' page HTML
+        ob_start();
+        wc_get_template('checkout/thankyou.php', array('order' => $order));
+        $thankyou_page_html = ob_get_clean();
+
+        wp_send_json_success(['thankyou_page_html' => $thankyou_page_html]);
+      }
+    }
+
+
+
+    // foreach ($_POST['data'] as $key => $value) {
+    //   error_log('kili');
+    //   error_log("$key => $value");
+    // }
+
+    // try {
+
+    //   $order_id = $checkout->create_order($_POST);
+    //   $order = wc_get_order($order_id);
+    //   error_log($order_id);
+
+    //   if ($order) {
+    //     $checkout->process_checkout();
+
+    //     ob_start();
+    //     // Load the order received template or a custom template with order details
+    //     wc_get_template('checkout/thankyou.php', array('order' => $order));
+    //     $order_confirmation_html = ob_get_clean();
+    //     error_log('skata');
+    //     wp_send_json_success(['order_confirmation_html' => $order_confirmation_html]);
+    //   } else {
+    //     error_log('Error processing order');
+    //     wp_send_json_error('Error processing order');
+    //   }
+    // } catch (Exception $e) {
+    //   wp_send_json_error($e->getMessage());
+    //   error_log('Error processing order asssas');
+    // }
+
+    // try {
+
+    //   // Attempt to process the checkout.
+    //   // WC()->checkout()->process_checkout();
+
+    //   // Prevent WooCommerce from performing a standard redirect.
+    //   remove_action('woocommerce_checkout_order_processed', 'wc_checkout_maybe_redirect_after_order', 10);
+
+    //   error_log('handle_modal_checkout');
+
+    //   // Capture the "Thank You" page content.
+    //   ob_start();
+    //   wc_get_template('checkout/thankyou.php');
+    //   $thank_you_content = ob_get_clean();
+    //   error_log($thank_you_content);
+
+    //   // Send the "Thank You" page content back to the JavaScript.
+    //   wp_send_json_success(['thank_you_content' => $thank_you_content]);
+    // } catch (Exception $e) {
+    //   error_log('handle_modal_checkout kili');
+    //   error_log($e->getMessage());
+    //   // Handle any errors during checkout and send back to JavaScript.
+    //   wp_send_json_error(['error' => $e->getMessage()]);
+    // }
   }
 
 
