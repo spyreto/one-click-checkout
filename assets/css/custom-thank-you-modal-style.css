@@ -1,0 +1,25 @@
+/* Hide elements that are not needed in the modal */
+header,
+footer,
+#wpadminbar,
+#secondary,
+.woocommerce-order-details,
+.woocommerce-customer-details,
+.edit-link,
+[class*="breadcrumb"] {
+  display: none !important;
+}
+
+html {
+  margin: 24px 0 18px 0 !important;
+}
+
+main,
+article {
+  margin: 0 !important;
+}
+
+.woocommerce-thankyou-order-received {
+  font-size: 16px;
+  text-align: center;
+}

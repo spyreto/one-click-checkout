@@ -39,7 +39,9 @@ class One_Click_Checkout
     // Load the modal template.
     add_action('wp_footer', array($this, 'conditionally_load_modal'));
     // Restore the original cart after a successful purchase.
-    // add_action('woocommerce_thankyou', array($this, 'restore_original_cart'));
+    add_action('woocommerce_thankyou', 'restore_cart_after_order_complete', 10, 1);
+    // Customize the thank you page for the modal.
+    add_action('template_redirect', 'customize_thank_you_page_for_modal');
   }
 
   /**
@@ -308,7 +310,6 @@ class One_Click_Checkout
     $formatted_address = WC()->countries->get_formatted_address($shipping_address);
 
     // Display the formatted address
-    echo '<div class="one-click-checkout-loading">Loading...</div>'; // Spinner element
     echo '<div class="woocommerce-billing-fields__field-wrapper one-click-checkout-shipping-address"">';
     echo '<h3>' . __('Shipping Details:', 'one-click-checkout') . '</h3>';
     echo '<address>' . $formatted_address . '</address>';
@@ -368,7 +369,7 @@ class One_Click_Checkout
     if (!check_ajax_referer('one_click_checkout_nonce', 'nonce')) {
       wp_die('Nonce verification failed!');
     }
-    ob_start();
+    // ob_start();
 
     $user_id = get_current_user_id();
 
@@ -392,6 +393,7 @@ class One_Click_Checkout
       WC()->session->set('chosen_shipping_methods', array($preferred_shipping_method));
     }
 
+    // Add the shipping address to the checkout form
     add_action('woocommerce_checkout_after_customer_details',  array($this, 'display_shipping_address'), 20);
 
     // Load the checkout form
@@ -410,6 +412,13 @@ class One_Click_Checkout
     if (!check_ajax_referer('one_click_checkout_nonce', 'nonce')) {
       wp_die('Nonce verification failed!');
     }
+
+    if (is_checkout()) {
+      error_log('is checkout');
+    } else {
+      error_log('is not checkout');
+    }
+
 
     if (isset($_POST['address_data'])) {
       $address_data = json_decode(stripslashes($_POST['address_data']), true);
@@ -485,6 +494,8 @@ class One_Click_Checkout
 
     $order = wc_get_order($order_id);
 
+
+
     // Assuming the order requires payment
     if ($order->needs_payment()) {
       // Get the payment gateway redirect URL
@@ -494,14 +505,11 @@ class One_Click_Checkout
       if ($payment_gateway) {
         // Manually process the payment
         $result = $payment_gateway->process_payment($order_id);
-        error_log(print_r($result, true));
 
         if ($result['result'] === 'success') {
           // Send the redirect URL to the client
-          error_log('RESULT');
           wp_send_json_success(['redirect_url' => $result['redirect']]);
         } else {
-          error_log('RESULT ERROR');
           wp_send_json_error('Error processing payment.');
         }
       } else {
@@ -513,62 +521,6 @@ class One_Click_Checkout
         wp_send_json_success(['thankyou_page_html' => $thankyou_page_html]);
       }
     }
-
-
-
-    // foreach ($_POST['data'] as $key => $value) {
-    //   error_log('kili');
-    //   error_log("$key => $value");
-    // }
-
-    // try {
-
-    //   $order_id = $checkout->create_order($_POST);
-    //   $order = wc_get_order($order_id);
-    //   error_log($order_id);
-
-    //   if ($order) {
-    //     $checkout->process_checkout();
-
-    //     ob_start();
-    //     // Load the order received template or a custom template with order details
-    //     wc_get_template('checkout/thankyou.php', array('order' => $order));
-    //     $order_confirmation_html = ob_get_clean();
-    //     error_log('skata');
-    //     wp_send_json_success(['order_confirmation_html' => $order_confirmation_html]);
-    //   } else {
-    //     error_log('Error processing order');
-    //     wp_send_json_error('Error processing order');
-    //   }
-    // } catch (Exception $e) {
-    //   wp_send_json_error($e->getMessage());
-    //   error_log('Error processing order asssas');
-    // }
-
-    // try {
-
-    //   // Attempt to process the checkout.
-    //   // WC()->checkout()->process_checkout();
-
-    //   // Prevent WooCommerce from performing a standard redirect.
-    //   remove_action('woocommerce_checkout_order_processed', 'wc_checkout_maybe_redirect_after_order', 10);
-
-    //   error_log('handle_modal_checkout');
-
-    //   // Capture the "Thank You" page content.
-    //   ob_start();
-    //   wc_get_template('checkout/thankyou.php');
-    //   $thank_you_content = ob_get_clean();
-    //   error_log($thank_you_content);
-
-    //   // Send the "Thank You" page content back to the JavaScript.
-    //   wp_send_json_success(['thank_you_content' => $thank_you_content]);
-    // } catch (Exception $e) {
-    //   error_log('handle_modal_checkout kili');
-    //   error_log($e->getMessage());
-    //   // Handle any errors during checkout and send back to JavaScript.
-    //   wp_send_json_error(['error' => $e->getMessage()]);
-    // }
   }
 
 
@@ -592,44 +544,65 @@ class One_Click_Checkout
   }
 }
 
+/**
+ * Customize the thank you page for the modal.
+ */
+function customize_thank_you_page_for_modal()
+{
+  if (is_wc_endpoint_url('order-received') && isset($_GET['from_modal'])) {
+    // Enqueue a special CSS file or inline styles to hide unwanted elements
+    wp_enqueue_style('custom-thank-you-modal-style', plugin_dir_url(dirname(__FILE__)) . 'assets/css/custom-thank-you-modal-style.css');
+  }
+}
 
 
 /**
- * Handle the Buy Now button click.
+ * Restores the previously saved cart contents.
  *
- * This function is called when the Buy Now button is clicked.
- * It checks the nonce, retrieves the product ID and quantity from the request,
+ * This function retrieves the cart contents that were saved in the WooCommerce session
+ * and restores them to the current cart. It's typically called after the checkout process
+ * to restore the cart to its state before checkout began.
  */
-  // public function handle_one_click_checkout()
-  // {
+function restore_saved_cart_contents()
+{
+  // Check if the WooCommerce session is initialized
+  if (is_null(WC()->session)) {
+    return;
+  }
 
-  //   // Check the nonce
-  //   if (!check_ajax_referer('one_click_checkout_nonce', 'nonce')) {
-  //     wp_die('Nonce verification failed!');
-  //   }
+  // Retrieve the saved cart contents from the session
+  $saved_cart_contents = WC()->session->get('saved_cart_contents');
 
-  //   $user_id = get_current_user_id();
+  // Check if there are saved cart contents and they are in array format
+  if ($saved_cart_contents && is_array($saved_cart_contents)) {
+    // Optionally clear the current cart to avoid mixing old and new items
+    WC()->cart->empty_cart();
 
-  //   // Retrieve the product ID and quantity
-  //   $product_id = $_POST['product_id'];
-  //   $quantity = isset($_POST['quantity']) ? intval($_POST['quantity']) : 1;
+    // Loop through the saved cart items and add them back to the cart
+    foreach ($saved_cart_contents as $item_key => $item) {
+      $product_id = $item['product_id'];
+      $quantity = $item['quantity'];
+      $variation_id = isset($item['variation_id']) ? $item['variation_id'] : '';
+      $variation = isset($item['variation']) ? $item['variation'] : array();
+      $cart_item_data = isset($item['cart_item_data']) ? $item['cart_item_data'] : array();
 
-  //   // Store current cart items
-  //   $cart_contents = WC()->cart->get_cart_contents();
-  //   WC()->session->set('saved_cart_contents', $cart_contents);
+      WC()->cart->add_to_cart($product_id, $quantity, $variation_id, $variation, $cart_item_data);
+    }
 
-  //   // Empty the current cart
-  //   WC()->cart->empty_cart(false);
+    // Clear the saved cart contents from the session to avoid duplication in future
+    WC()->session->set('saved_cart_contents', null);
+  }
+}
 
-  //   // Add the 'Buy Now' product to the cart
-  //   WC()->cart->add_to_cart($product_id, $quantity);
-
-  //   // Apply stored shipping method
-  //   $preferred_shipping_method = get_user_meta($user_id, 'preferred_shipping_method', true);
-  //   if ($preferred_shipping_method) {
-  //     WC()->session->set('chosen_shipping_methods', array($preferred_shipping_method));
-  //   }
-
-  //   // Return the checkout URL
-  //   wp_send_json_success(['checkout_url' => wc_get_checkout_url()]);
-  // }
+/* 
+ * Restore the original cart after a successful purchase.
+ * 
+ * This function is called after a successful purchase and restores the original cart contents.
+ * It's intended to be hooked into the 'woocommerce_thankyou' action.
+ */
+function restore_cart_after_order_complete($order_id)
+{
+  // Optionally check additional conditions if necessary
+  // Restore the original cart
+  restore_saved_cart_contents();
+}

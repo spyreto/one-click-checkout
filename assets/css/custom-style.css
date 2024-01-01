@@ -1,4 +1,6 @@
-@keyframes spin {
+/* Path: wp-content/plugins/one-click-checkout/assets/css/custom-style.css */
+
+@keyframes rotation {
   0% {
     transform: rotate(0deg);
   }
@@ -11,13 +13,15 @@
 #one-click-checkout-modal {
   display: none; /* Hidden by default */
   position: fixed; /* Stay in place */
-  z-index: 999999; /* Sit on top */
+  z-index: 99999; /* Sit on top */
   left: 0;
   top: 0;
   width: 100%; /* Full width */
   height: 100%; /* Full height */
   overflow: auto; /* Enable scroll if needed */
   background-color: rgba(0, 0, 0, 0.4); /* Black w/ opacity */
+  opacity: 0; /* Start with 0 opacity */
+  transition: opacity 0.4s ease; /* Animate the opacity */
 }
 
 /* Modal Content */
@@ -27,6 +31,8 @@
   padding: 20px;
   border: 1px solid #888;
   max-width: 450px; /* Could be more or less, depending on screen size */
+  display: none;
+  transition: transform 0.8s ease-out; /* Optional: for additional animation */
 }
 
 #one-click-checkout-close-modal {
@@ -59,29 +65,20 @@
   display: none;
 }
 
-.one-click-checkout-loading {
-  display: none; /* Hidden by default */
-  text-align: center;
-}
-
-.one-click-checkout-loading:after {
-  content: "";
-  display: inline-block;
-  width: 20px;
-  height: 20px;
-  border: 2px solid #ccc;
-  border-top-color: #333;
+.one-click-checkout-loader {
+  width: 48px;
+  height: 48px;
+  border: 5px solid #fefefe;
+  border-bottom-color: transparent;
   border-radius: 50%;
-  animation: spin 1s linear infinite;
-}
-
-@keyframes spin {
-  0% {
-    transform: rotate(0deg);
-  }
-  100% {
-    transform: rotate(360deg);
-  }
+  display: inline-block;
+  box-sizing: border-box;
+  animation: rotation 1s linear infinite;
+  position: fixed; /* Stay in place */
+  z-index: 999999;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
 }
 
 @media screen and (min-width: 768px) {
