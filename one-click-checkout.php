@@ -23,7 +23,7 @@ require_once plugin_dir_path(__FILE__) . 'includes/class-one-click-checkout.php'
 /**
  * Function to check plugin requirements on activation.
  */
-function one_click_check_activation()
+function one_click_checkout_activation()
 {
   if (!class_exists('WooCommerce')) {
     wp_die('This plugin requires WooCommerce to be installed and active.', 'Plugin dependency check', array('back_link' => true));

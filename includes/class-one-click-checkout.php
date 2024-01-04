@@ -29,7 +29,7 @@ class One_Click_Checkout
     // Add custom CSS to the "Buy now" button.
     add_action('wp_head', array($this, 'add_custom_css'));
     // Save user data for one-click checkout after a successful purchase.
-    add_action('woocommerce_order_status_completed', array($this, 'save_checkout_data'));
+    add_action('woocommerce_thankyou', array($this, 'save_checkout_data'));
     // Display the Buy Now button on the product page.
     add_action('woocommerce_after_add_to_cart_button', array($this, 'display_buy_now_button'));
     // Handle the Buy Now button click.
